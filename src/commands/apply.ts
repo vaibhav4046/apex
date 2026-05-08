@@ -90,9 +90,7 @@ async function processJobs(page: import("playwright").Page, profile: NonNullable
       continue;
     }
 
-    const result = await applyLinkedinJob(page, j.url, {
-      fullName: profile.fullName, email: profile.email, phone: profile.phone, resumePath: pdfPath,
-    });
+    const result = await applyLinkedinJob(page, j.url, profile, pdfPath, { debug: true });
     addApp({
       id: stamp.toString(36),
       jobUrl: j.url, jobTitle: j.title, company: j.company, platform: "linkedin",

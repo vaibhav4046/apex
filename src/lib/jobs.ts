@@ -1,4 +1,6 @@
 import type { Page } from "playwright";
+import type { Profile } from "./store.js";
+import { discoverFields, answerField, fillField } from "./form-filler.js";
 
 export type JobListing = {
   platform: "linkedin" | "indeed" | "wellfound";
@@ -62,52 +64,67 @@ export async function searchLinkedin(page: Page, opts: { q: string; location?: s
   });
 }
 
-/** Apply to a single LinkedIn Easy Apply job. Best-effort: fills text fields, clicks Submit, snapshots state. */
-export async function applyLinkedinJob(page: Page, jobUrl: string, profile: { fullName: string; email: string; phone?: string; resumePath?: string }): Promise<{ ok: boolean; message: string }> {
+/** Apply to a single LinkedIn Easy Apply job using LLM-driven form filler. */
+export async function applyLinkedinJob(
+  page: Page,
+  jobUrl: string,
+  profile: Profile,
+  resumePath: string,
+  opts: { maxSteps?: number; debug?: boolean } = {},
+): Promise<{ ok: boolean; message: string; stepsCompleted: number }> {
+  const maxSteps = opts.maxSteps ?? 10;
   await page.goto(jobUrl, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
   const easyBtn = await page.$('button.jobs-apply-button, button[aria-label*="Easy Apply"]');
-  if (!easyBtn) return { ok: false, message: "No Easy Apply button found" };
+  if (!easyBtn) return { ok: false, message: "No Easy Apply button found", stepsCompleted: 0 };
   await easyBtn.click();
   await page.waitForTimeout(1500);
 
-  // Fill multiple steps until Review/Submit appears
-  const MAX_STEPS = 6;
-  for (let i = 0; i < MAX_STEPS; i++) {
-    await page.waitForTimeout(800);
+  let stepsCompleted = 0;
+  for (let i = 0; i < maxSteps; i++) {
+    await page.waitForTimeout(700);
 
-    // Phone
-    if (profile.phone) {
-      const phoneInput = await page.$('input[id*="phoneNumber"], input[id*="phone"]');
-      if (phoneInput) {
-        const cur = await phoneInput.inputValue();
-        if (!cur) await phoneInput.fill(profile.phone);
-      }
+    // Attach resume if file input present
+    const fileInputs = await page.$$('input[type="file"]');
+    for (const fi of fileInputs) {
+      try { await fi.setInputFiles(resumePath); } catch { /* ignore */ }
     }
 
-    // Resume upload
-    if (profile.resumePath) {
-      const fileInput = await page.$('input[type="file"]');
-      if (fileInput) {
-        try { await fileInput.setInputFiles(profile.resumePath); } catch { /* maybe hidden */ }
+    // Discover + answer + fill
+    const fields = await discoverFields(page);
+    if (opts.debug) console.log(`[step ${i}] ${fields.length} fields`);
+    for (const f of fields) {
+      if (f.kind === "file") continue;
+      try {
+        const cur = (f.kind === "text" || f.kind === "textarea") ? await f.el.inputValue().catch(() => "") : "";
+        if (cur && cur.trim()) continue;
+      } catch { /* ignore */ }
+      const answer = await answerField(f, profile);
+      if (!answer) {
+        if (f.required) {
+          return { ok: false, message: `Stuck on required field: "${f.label}"`, stepsCompleted };
+        }
+        continue;
       }
+      const ok = await fillField(page, f, answer);
+      if (opts.debug) console.log(`  ${ok ? "✓" : "✗"} [${f.kind}] ${f.label} → ${answer.slice(0, 40)}`);
     }
 
-    // Click Next / Review / Submit
-    const reviewBtn = await page.$('button[aria-label*="Review"]');
+    await page.waitForTimeout(400);
+
     const submitBtn = await page.$('button[aria-label*="Submit application"]');
-    const nextBtn = await page.$('button[aria-label*="Continue to next step"], button[aria-label*="Next"]');
-
     if (submitBtn) {
       await submitBtn.click();
       await page.waitForTimeout(2000);
-      return { ok: true, message: "Submitted" };
+      return { ok: true, message: "Submitted", stepsCompleted: stepsCompleted + 1 };
     }
-    if (reviewBtn) { await reviewBtn.click(); continue; }
-    if (nextBtn) { await nextBtn.click(); continue; }
+    const reviewBtn = await page.$('button[aria-label*="Review"]');
+    if (reviewBtn) { await reviewBtn.click(); stepsCompleted++; continue; }
+    const nextBtn = await page.$('button[aria-label*="Continue to next step"], button[aria-label*="Next"]');
+    if (nextBtn) { await nextBtn.click(); stepsCompleted++; continue; }
     break;
   }
-  return { ok: false, message: "Could not complete multi-step form (likely needs custom answers)" };
+  return { ok: false, message: "Could not advance form (validation error or unknown step)", stepsCompleted };
 }
 
 export async function searchIndeed(page: Page, opts: { q: string; location?: string; remote?: boolean }): Promise<JobListing[]> {
