@@ -39,10 +39,12 @@ program
   .description("Auto-apply to jobs (LinkedIn Easy Apply)")
   .option("-q, --query <text>", "Search query (defaults to first target role)")
   .option("-l, --location <text>", "Location filter")
-  .option("-n, --limit <num>", "Max applications", (v) => parseInt(v, 10), 10)
+  .option("-n, --limit <num>", "Max applications (ignored if --all)", (v) => parseInt(v, 10), 10)
+  .option("--all", "Run until LinkedIn daily Easy Apply cap or rate-limit hit")
   .option("--dry-run", "Generate resumes but do not submit")
   .option("--headless", "Run browser headless (you must be logged in already)")
   .option("--platform <name>", "linkedin | indeed", "linkedin")
+  .option("--delay <ms>", "Delay between applications", (v) => parseInt(v, 10), 2500)
   .action(applyCommand);
 
 program.command("history").description("Show recent applications").action(historyCommand);

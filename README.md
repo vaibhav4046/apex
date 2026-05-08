@@ -10,13 +10,24 @@ Generates tailored 1-page resumes + cover letters, then applies on LinkedIn Easy
 
 ---
 
+<table align="center">
+<tr>
+<td width="50%"><img src="docs/cli-real.png" alt="apex CLI — real stdout"></td>
+<td width="50%"><img src="docs/linkedin-search.png" alt="LinkedIn jobs page apex drives"></td>
+</tr>
+<tr>
+<td align="center"><em>real apex CLI run — `apex resume`</em></td>
+<td align="center"><em>LinkedIn page apex drives via Playwright</em></td>
+</tr>
+</table>
+
 <p align="center">
-  <img src="docs/cli-demo.png" alt="apex CLI demo" width="640">
+  <em>Tailored 1-page resume, generated per job:</em><br>
+  <img src="docs/resume-preview.png" alt="Tailored resume" width="520">
 </p>
 
 <p align="center">
-  <em>One-page tailored resume, generated per job:</em><br>
-  <img src="docs/resume-preview.png" alt="Tailored resume" width="520">
+  <img src="docs/cli-demo.png" alt="apex apply flow" width="640">
 </p>
 
 ---
@@ -31,6 +42,9 @@ $ apex apply -q "Senior Frontend" -n 10
                                        # opens Chrome, finds 10 Easy Apply jobs,
                                        # generates a tailored resume per job,
                                        # and submits each (or --dry-run)
+$ apex apply -q "Senior Frontend" --all
+                                       # apply autonomously until LinkedIn's
+                                       # daily Easy Apply cap or rate-limit hit
 $ apex history                         # see what was sent where
 ```
 
@@ -102,7 +116,7 @@ src/
 - **Indeed driver** is search-only in v0.1. Easy Apply submission coming.
 - **Wellfound / RemoteOK / etc.** — not yet supported.
 - **No bypass for CAPTCHAs / 2FA** — you log in once, state persists.
-- **Be polite.** LinkedIn rate-limits aggressively. Default delay between applications is 2.5s. Don't run with `-n > 50` in one batch.
+- **Be polite.** LinkedIn rate-limits aggressively. Default delay between applications is 2.5s (configurable via `--delay`). With `--all`, apex auto-detects the daily Easy Apply cap and stops cleanly.
 
 ## Roadmap
 

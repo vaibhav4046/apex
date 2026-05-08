@@ -12,6 +12,8 @@ export async function applyCommand(opts: {
   query?: string;
   location?: string;
   limit?: number;
+  all?: boolean;
+  delay?: number;
   dryRun?: boolean;
   headless?: boolean;
   platform?: "linkedin" | "indeed";
@@ -25,8 +27,10 @@ export async function applyCommand(opts: {
   const platform = opts.platform ?? "linkedin";
   const query = opts.query ?? profile.preferences.targetRoles[0];
   const location = opts.location ?? profile.preferences.targetLocations[0];
-  const limit = opts.limit ?? 10;
+  const runAll = !!opts.all;
+  const limit = runAll ? 9999 : (opts.limit ?? 10);
   const dryRun = !!opts.dryRun;
+  const delayMs = opts.delay ?? 2500;
 
   if (!query) { p.cancel("No target role. Provide --query or run `apex init`."); process.exit(1); }
 
@@ -35,7 +39,7 @@ export async function applyCommand(opts: {
     `Query:    ${kleur.cyan(query)}`,
     `Location: ${kleur.cyan(location ?? "any")}`,
     `Limit:    ${kleur.cyan(String(limit))}`,
-    `Mode:     ${kleur.cyan(dryRun ? "DRY RUN (no submit)" : "LIVE")}`,
+    `Mode:     ${kleur.cyan(dryRun ? "DRY RUN (no submit)" : runAll ? "LIVE — until LinkedIn cap" : "LIVE")}`,
   ].join("\n"), "Run config");
 
   if (!dryRun) {
@@ -52,11 +56,11 @@ export async function applyCommand(opts: {
       const loggedIn = await ensureLoggedIn(page, "linkedin", "https://www.linkedin.com/feed/", "start a post");
       if (!loggedIn) { p.cancel("LinkedIn login required."); return; }
       const s = p.spinner(); s.start("Searching LinkedIn jobs…");
-      const jobs = await searchLinkedin(page, { q: query, location, remote: profile.preferences.workType.includes("remote"), pages: Math.ceil(limit / 25) });
+      const jobs = await searchLinkedin(page, { q: query, location, remote: profile.preferences.workType.includes("remote"), pages: runAll ? 40 : Math.ceil(limit / 25) });
       s.stop(`Found ${jobs.length} jobs`);
       const targets = jobs.filter((j) => j.easyApply).slice(0, limit);
       if (targets.length === 0) { p.outro("No Easy Apply jobs matched."); return; }
-      await processJobs(page, profile, targets, dryRun);
+      await processJobs(page, profile, targets, dryRun, delayMs);
     } else {
       p.cancel(`Platform ${platform} not yet implemented in this build.`);
     }
@@ -66,7 +70,9 @@ export async function applyCommand(opts: {
   p.outro(kleur.green("Done. See `apex history` for run summary."));
 }
 
-async function processJobs(page: import("playwright").Page, profile: NonNullable<ReturnType<typeof readProfile>>, jobs: JobListing[], dryRun: boolean) {
+async function processJobs(page: import("playwright").Page, profile: NonNullable<ReturnType<typeof readProfile>>, jobs: JobListing[], dryRun: boolean, delayMs: number) {
+  let consecutiveFailures = 0;
+  let submitted = 0;
   for (let i = 0; i < jobs.length; i++) {
     const j = jobs[i];
     p.log.step(`(${i + 1}/${jobs.length}) ${kleur.cyan(j.title)} @ ${j.company}`);
@@ -112,8 +118,22 @@ async function processJobs(page: import("playwright").Page, profile: NonNullable
       message: result.message,
     } as Application);
     p.log.message(`  ${result.ok ? kleur.green("✓ " + result.message) : kleur.yellow("⚠ " + result.message)}`);
-    await page.waitForTimeout(2500); // be polite
+
+    if (result.ok) { submitted++; consecutiveFailures = 0; }
+    else consecutiveFailures++;
+
+    // Detect LinkedIn daily Easy Apply cap or rate-limit
+    if (/daily limit|reached.*limit|too many|rate.?limit|try again later|temporarily restricted|unusual activity/i.test(result.message)) {
+      p.log.error(kleur.red(`🛑 LinkedIn cap hit. Stopping. Submitted ${submitted} this run.`));
+      break;
+    }
+    if (consecutiveFailures >= 5) {
+      p.log.error(kleur.red(`🛑 5 consecutive failures. LinkedIn likely throttling. Stopping. Submitted ${submitted} this run.`));
+      break;
+    }
+    await page.waitForTimeout(delayMs);
   }
+  p.log.success(kleur.green(`Run complete. ${submitted} submitted.`));
 }
 
 async function tailorResume(profile: NonNullable<ReturnType<typeof readProfile>>, jobBlurb: string): Promise<string> {

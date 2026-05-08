@@ -75,6 +75,16 @@ export async function applyLinkedinJob(
   const maxSteps = opts.maxSteps ?? 10;
   await page.goto(jobUrl, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
+
+  // Detect throttling / captcha / blocked
+  const bodyText = (await page.locator("body").innerText().catch(() => "")).toLowerCase();
+  if (/unusual activity|verify you.?re a human|captcha|temporarily restricted|too many requests/i.test(bodyText)) {
+    return { ok: false, message: "LinkedIn rate-limit / unusual activity check triggered", stepsCompleted: 0 };
+  }
+  if (/you've reached.*easy apply|daily.*easy apply.*limit|application limit reached/i.test(bodyText)) {
+    return { ok: false, message: "Daily Easy Apply limit reached", stepsCompleted: 0 };
+  }
+
   const easyBtn = await page.$('button.jobs-apply-button, button[aria-label*="Easy Apply"]');
   if (!easyBtn) return { ok: false, message: "No Easy Apply button found", stepsCompleted: 0 };
   await easyBtn.click();
