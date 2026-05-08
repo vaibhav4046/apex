@@ -90,7 +90,20 @@ async function processJobs(page: import("playwright").Page, profile: NonNullable
       continue;
     }
 
-    const result = await applyLinkedinJob(page, j.url, profile, pdfPath, { debug: true });
+    let result = await applyLinkedinJob(page, j.url, profile, pdfPath, { debug: true });
+
+    // Pause-on-stuck: let user finish in browser, then resume
+    if (!result.ok && /Stuck on required/.test(result.message)) {
+      p.log.warn(kleur.yellow(`⏸  ${result.message}`));
+      const takeover = (await p.confirm({
+        message: "Finish this application in the browser, then continue?",
+        initialValue: true,
+      })) as boolean;
+      if (takeover) {
+        result = { ok: true, message: "submitted (human takeover)", stepsCompleted: result.stepsCompleted };
+      }
+    }
+
     addApp({
       id: stamp.toString(36),
       jobUrl: j.url, jobTitle: j.title, company: j.company, platform: "linkedin",
@@ -98,7 +111,7 @@ async function processJobs(page: import("playwright").Page, profile: NonNullable
       resumePath: pdfPath, appliedAt: stamp,
       message: result.message,
     } as Application);
-    p.log.message(`  ${result.ok ? kleur.green("✓ submitted") : kleur.yellow("⚠ " + result.message)}`);
+    p.log.message(`  ${result.ok ? kleur.green("✓ " + result.message) : kleur.yellow("⚠ " + result.message)}`);
     await page.waitForTimeout(2500); // be polite
   }
 }

@@ -87,7 +87,7 @@ src/
 
 ## Honest limitations
 
-- **LinkedIn forms with custom questions** (visa, salary, "why this company") fall back to "human takeover" — apex pauses and lets you finish.
+- **LinkedIn custom questions** are answered autonomously via LLM (profile mapping → cache → LLM fallback). On a required field with no confident answer, apex pauses and lets you finish.
 - **Indeed driver** is search-only in v0.1. Easy Apply submission coming.
 - **Wellfound / RemoteOK / etc.** — not yet supported.
 - **No bypass for CAPTCHAs / 2FA** — you log in once, state persists.
@@ -97,8 +97,8 @@ src/
 
 - [ ] Indeed Easy Apply submission
 - [ ] Wellfound (AngelList) support
-- [ ] LLM-based answer generation for custom application questions
-- [ ] Pause-on-question UX (notify user, resume after answer)
+- [x] LLM-based answer generation for custom application questions
+- [x] Pause-on-question UX (notify user, resume after answer)
 - [ ] Resume A/B testing across roles
 - [ ] Slack/email notifications for submitted jobs
 - [ ] Cron mode (daily applies)
