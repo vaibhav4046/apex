@@ -10,6 +10,17 @@ Generates tailored 1-page resumes + cover letters, then applies on LinkedIn Easy
 
 ---
 
+<p align="center">
+  <img src="docs/cli-demo.png" alt="apex CLI demo" width="640">
+</p>
+
+<p align="center">
+  <em>One-page tailored resume, generated per job:</em><br>
+  <img src="docs/resume-preview.png" alt="Tailored resume" width="520">
+</p>
+
+---
+
 ## What it does
 
 ```
