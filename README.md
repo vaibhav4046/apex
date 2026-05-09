@@ -2,6 +2,8 @@
 
 # apex
 
+<img src="docs/banner.png" alt="apex — autonomous job application engine" width="100%">
+
 **Autonomous job application CLI · Free LLMs · GitHub-aware**
 
 Generates tailored 1-page resumes + cover letters, then applies on LinkedIn Easy Apply for you while you sleep.
