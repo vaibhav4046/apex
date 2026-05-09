@@ -12,7 +12,7 @@ export type JobListing = {
   description?: string;
 };
 
-const JOB_CARD_LI = "div.job-card-container, li.jobs-search-results__list-item";
+const JOB_CARD_LI = "li[data-occludable-job-id], div.job-card-container, li.jobs-search-results__list-item, div.job-card-job-posting-card-wrapper, [data-job-id]";
 
 export async function searchLinkedin(page: Page, opts: { q: string; location?: string; remote?: boolean; pages?: number }): Promise<JobListing[]> {
   const params = new URLSearchParams({
@@ -30,16 +30,21 @@ export async function searchLinkedin(page: Page, opts: { q: string; location?: s
     await page.waitForSelector(JOB_CARD_LI, { timeout: 15_000 }).catch(() => {});
     const items = await page.$$eval(JOB_CARD_LI, (cards) =>
       cards.map((c) => {
-        const a = c.querySelector("a.job-card-list__title, a.job-card-container__link") as HTMLAnchorElement | null;
-        const titleEl = c.querySelector(".job-card-list__title strong, .job-card-list__title, .job-card-container__link") as HTMLElement | null;
-        const companyEl = c.querySelector(".job-card-container__primary-description, .job-card-container__company-name") as HTMLElement | null;
-        const locEl = c.querySelector(".job-card-container__metadata-item") as HTMLElement | null;
-        const easy = !!c.querySelector(".job-card-container__easy-apply, .job-card-container__apply-method");
+        const a =
+          c.querySelector('a.job-card-list__title, a.job-card-container__link, a[href*="/jobs/view/"]') as HTMLAnchorElement | null;
+        const titleEl =
+          c.querySelector('.job-card-list__title strong, .job-card-list__title, .job-card-container__link, [aria-label][class*="job-card"], strong') as HTMLElement | null;
+        const companyEl =
+          c.querySelector('.job-card-container__primary-description, .job-card-container__company-name, .artdeco-entity-lockup__subtitle, [class*="subtitle"]') as HTMLElement | null;
+        const locEl =
+          c.querySelector('.job-card-container__metadata-item, .artdeco-entity-lockup__caption, [class*="caption"]') as HTMLElement | null;
+        const fullText = (c as HTMLElement).innerText || "";
+        const easy = /easy apply/i.test(fullText) || !!c.querySelector('.job-card-container__easy-apply, .job-card-container__apply-method');
         return {
           url: a?.href ?? "",
-          title: (titleEl?.innerText || a?.innerText || "").trim(),
-          company: (companyEl?.innerText || "").trim(),
-          location: (locEl?.innerText || "").trim(),
+          title: (titleEl?.innerText || a?.getAttribute("aria-label") || a?.innerText || "").trim().split("\n")[0],
+          company: (companyEl?.innerText || "").trim().split("\n")[0],
+          location: (locEl?.innerText || "").trim().split("\n")[0],
           easyApply: easy,
         };
       }),

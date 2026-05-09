@@ -13,6 +13,7 @@ export async function applyCommand(opts: {
   location?: string;
   limit?: number;
   all?: boolean;
+  yes?: boolean;
   delay?: number;
   dryRun?: boolean;
   headless?: boolean;
@@ -42,7 +43,7 @@ export async function applyCommand(opts: {
     `Mode:     ${kleur.cyan(dryRun ? "DRY RUN (no submit)" : runAll ? "LIVE — until LinkedIn cap" : "LIVE")}`,
   ].join("\n"), "Run config");
 
-  if (!dryRun) {
+  if (!dryRun && !opts.yes) {
     const ok = (await p.confirm({
       message: `Apply to ${limit} jobs autonomously? You can intervene anytime.`,
       initialValue: false,

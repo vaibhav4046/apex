@@ -41,6 +41,7 @@ program
   .option("-l, --location <text>", "Location filter")
   .option("-n, --limit <num>", "Max applications (ignored if --all)", (v) => parseInt(v, 10), 10)
   .option("--all", "Run until LinkedIn daily Easy Apply cap or rate-limit hit")
+  .option("-y, --yes", "Skip confirmation prompt (for non-interactive runs)")
   .option("--dry-run", "Generate resumes but do not submit")
   .option("--headless", "Run browser headless (you must be logged in already)")
   .option("--platform <name>", "linkedin | indeed", "linkedin")
